@@ -3,6 +3,8 @@ import base64
 
 STARTFLAG = b'\x01'
 ENDFLAG = b'\x02'
+MESSAGESTART = '--'
+MESSAGEEND = '=='
 BUFFER_SIZE = 8192
 
 class TcpClient:
@@ -63,8 +65,8 @@ class TcpClient:
         except Exception as e:
             print(f"[!] 接收失败: {e}")
             return []
-
-        return self._extract_packets()
+        packets = self._extract_packets();
+        return self._extract_message(packets)
 
     def _extract_packets(self) -> list[str]:
         packets = []
@@ -82,3 +84,20 @@ class TcpClient:
             else:
                 break
         return packets
+    
+    def _extract_message(self, packets) -> list[str]:
+        messages = []
+        for packet in packets:
+            start = 0
+            while True:
+                start = packet.find(MESSAGESTART, start)
+                if start == -1:
+                    break
+                end = packet.find(MESSAGEEND, start + len(MESSAGESTART))
+                if end == -1:
+                    break
+                data = packet[start + len(MESSAGESTART):end]
+                messages.append(data)
+                start = end + len(MESSAGEEND)
+        return messages
+

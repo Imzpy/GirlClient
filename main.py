@@ -3,6 +3,7 @@ import sys
 import threading
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSignal, QObject
+from PyQt5.QtCore import QStringListModel, QSortFilterProxyModel, Qt
 from ui_form import Ui_Dialog
 from tcpclient import TcpClient
 from commands import *
@@ -31,16 +32,29 @@ class MainApp(QtWidgets.QDialog):
 
         # 绑定按钮事件
         self.ui.clear_logs_button.clicked.connect(self.ui.textBrowser_log.clear)
-        self.ui.textEdit_lua.textChanged.connect(self.on_text_changed)
+        #self.ui.textEdit_lua.textChanged.connect(self.on_text_changed)
         self.ui.refresh_class_button.clicked.connect(self.refresh_classes)
+        self.ui.plainTextEdit_filterClassName.textChanged.connect(self.on_filterClass_text_changed)
+        self.ui.plainTextEdit_filterMethodname.textChanged.connect(self.on_filterMethod_text_changed)
+
+        # 初始化 model 并绑定到 listView
+        self.model = QStringListModel()
+        self.filter_proxy = QSortFilterProxyModel()
+        self.filter_proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)  # 忽略大小写
+        self.filter_proxy.setSourceModel(self.model)
+
+        # 设置 listView 显示代理模型（而不是原始 model）
+        self.ui.listView_classmethod.setModel(self.filter_proxy)
+        self.ui.classnameorg_model = self.model
 
         # 监听消息接收线程
         self.start_recv_thread()
 
-    def on_text_changed(self):
-        # 按下 Ctrl+Enter 发送内容
-        if self.ui.textEdit_lua.toPlainText().endswith("\n\n"):
-            self.send_lua_code()
+    def on_filterClass_text_changed(self,text):
+        self.filter_proxy.setFilterFixedString(text)
+
+    def on_filterMethod_text_changed(self,text):
+        pass
     
     def refresh_classes(self):
         data = {"command": REFRESH_ALL_CLASS}
@@ -63,7 +77,8 @@ class MainApp(QtWidgets.QDialog):
                 try:
                     messages = self.client.receive()
                     for msg in messages:
-                        self.signal_bus.log_signal.emit(f"[<] 收到: {msg}")
+                        #self.signal_bus.log_signal.emit(f"[<] 收到: {msg}")
+                        message_handler(self.ui, json.loads(msg))
                 except Exception as e:
                     self.signal_bus.log_signal.emit(f"[!] 接收异常: {e}")
                     break
