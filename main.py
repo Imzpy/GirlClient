@@ -118,9 +118,9 @@ class MainApp(QtWidgets.QDialog):
         funcname_leave =funcname_leave.replace('-','_')
         funcname_leave =funcname_leave.replace('$','_')
         template = """--模板自动生成 请勿修改函数名、参数列表\n
-function """ + funcname_enter + """(args)
+function """ + funcname_enter + """(args)\n    return true, args, 0
 end\n
-function """ + funcname_leave + """(ret)
+function """ + funcname_leave + """(ret)\n    return ret
 end"""
         self.editor.setText(template)
         
@@ -245,11 +245,12 @@ end"""
         leave_start = lua_script.find(funcname_leave)
         leave_end = lua_script.find('\nend', leave_start) + 4
 
-        luafunction_enter = lua_script[enter_start:enter_end]
-        luafunction_leave = lua_script[leave_start:leave_end]
+        luafunction_enter = 'function ' + lua_script[enter_start:enter_end]
+        luafunction_leave = 'function ' +lua_script[leave_start:leave_end]
         
 
         data = {
+            'className': self.operating_class_name,
             'hookFunction': name,
             'shorty': shorty,
             'is_static': is_static,
@@ -259,6 +260,11 @@ end"""
             'onLeave_Func': luafunction_leave,
         }
         print(data)
+        datatosend = data
+        datatosend[COMMAND] = INSTALL_HOOK
+        self.client.send(json.dumps(datatosend))
+        self.append_log(f"[>] 发送指令: {json.dumps(datatosend)}")
+
 
 
 

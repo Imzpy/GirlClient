@@ -12,6 +12,8 @@ METHODS = "methods"
 
 GET_ALL_HOOKS = "GET_ALL_HOOKS"
 
+INSTALL_HOOK = "INSTALL_HOOK"
+
 
 
 def message_handler(mainapp, json_Data):
