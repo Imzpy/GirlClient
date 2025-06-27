@@ -3,7 +3,8 @@ import sys
 import threading
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSignal, QObject
-from PyQt5.QtCore import QStringListModel, QSortFilterProxyModel, Qt
+from PyQt5.QtCore import QStringListModel, QSortFilterProxyModel, Qt, QModelIndex
+from PyQt5.QtWidgets import QAbstractItemView
 from ui_form import Ui_Dialog
 from tcpclient import TcpClient
 from commands import *
@@ -24,7 +25,7 @@ class MainApp(QtWidgets.QDialog):
         self.signal_bus.log_signal.connect(self.append_log)
 
         # 初始化 TCP 客户端
-        self.client = TcpClient("192.168.2.127", 8888)
+        self.client = TcpClient("192.168.2.169", 8888) #192.168.2.127
         if not self.client.connect():
             self.append_log("[!] 无法连接服务器")
         else:
@@ -38,14 +39,27 @@ class MainApp(QtWidgets.QDialog):
         self.ui.plainTextEdit_filterMethodname.textChanged.connect(self.on_filterMethod_text_changed)
 
         # 初始化 model 并绑定到 listView
-        self.model = QStringListModel()
+        self.cmodel = QStringListModel()
         self.filter_proxy = QSortFilterProxyModel()
         self.filter_proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)  # 忽略大小写
-        self.filter_proxy.setSourceModel(self.model)
+        self.filter_proxy.setSourceModel(self.cmodel)
 
+        self.ui.listView_classmethod.clicked.connect(self.on_classname_clicked)
+        self.ui.listView_classmethod.setEditTriggers(QAbstractItemView.NoEditTriggers)
         # 设置 listView 显示代理模型（而不是原始 model）
         self.ui.listView_classmethod.setModel(self.filter_proxy)
-        self.ui.classnameorg_model = self.model
+        self.ui.classnameorg_model = self.cmodel
+
+        self.mmodel = QStringListModel()
+        self.mfilter_proxy = QSortFilterProxyModel()
+        self.mfilter_proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)  # 忽略大小写
+        self.mfilter_proxy.setSourceModel(self.mmodel)
+        self.mfilter_proxy.setSourceModel(self.mmodel)
+        self.ui.listView_methods.clicked.connect(self.on_methodname_clicked)
+        self.ui.listView_methods.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        # 设置 listView 显示代理模型（而不是原始 model）
+        self.ui.listView_methods.setModel(self.mfilter_proxy)
+        self.ui.methodsorg_model = self.mmodel
 
         # 监听消息接收线程
         self.start_recv_thread()
@@ -54,12 +68,26 @@ class MainApp(QtWidgets.QDialog):
         self.filter_proxy.setFilterFixedString(text)
 
     def on_filterMethod_text_changed(self,text):
-        pass
+        self.mfilter_proxy.setFilterFixedString(text)
     
     def refresh_classes(self):
-        data = {"command": REFRESH_ALL_CLASS}
+        data = {COMMAND: REFRESH_ALL_CLASS}
         self.client.send(json.dumps(data))
         self.append_log(f"[>] 发送指令: {json.dumps(data)}")
+
+    def on_classname_clicked(self, index: QModelIndex):
+        source_index = self.filter_proxy.mapToSource(index)
+        text = self.cmodel.data(source_index, Qt.DisplayRole)
+        data = {COMMAND: REFRESH_ALL_METHODS, CLASSNAME:text}
+        self.client.send(json.dumps(data))
+        self.ui.textBrowser_log.append("[Log] 获取类" + text + "的方法.")
+        self.append_log(f"[>] 发送指令: {json.dumps(data)}")
+
+    def on_methodname_clicked(self, index: QModelIndex):
+        source_index = self.mfilter_proxy.mapToSource(index)
+        text = self.mmodel.data(source_index, Qt.DisplayRole)
+        self.ui.tip_methodname.setText('方法名:' + text)
+        self.ui.tip_methodname.setToolTip('方法名:' + text)
 
     def send_lua_code(self):
         content = self.ui.textEdit_lua.toPlainText().strip()
