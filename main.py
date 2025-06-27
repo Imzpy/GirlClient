@@ -5,6 +5,7 @@ from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSignal, QObject
 from PyQt5.QtCore import QStringListModel, QSortFilterProxyModel, Qt, QModelIndex
 from PyQt5.QtWidgets import QAbstractItemView
+from PyQt5.Qsci import QsciScintilla, QsciLexerLua
 from ui_form import Ui_Dialog
 from tcpclient import TcpClient
 from commands import *
@@ -60,6 +61,8 @@ class MainApp(QtWidgets.QDialog):
         # 设置 listView 显示代理模型（而不是原始 model）
         self.ui.listView_methods.setModel(self.mfilter_proxy)
         self.ui.methodsorg_model = self.mmodel
+
+        self.setup_lua_editor()
 
         # 监听消息接收线程
         self.start_recv_thread()
@@ -117,6 +120,43 @@ class MainApp(QtWidgets.QDialog):
     def closeEvent(self, event):
         self.client.close()
         event.accept()
+    def setup_lua_editor(self):
+        parent = self.ui.textEdit_lua.parent()
+        layout = parent.layout()
+
+        self.editor = QsciScintilla()
+        self.editor.setLexer(QsciLexerLua())
+        self.editor.setUtf8(True)
+        self.editor.setMarginsFont(self.editor.font())
+        self.editor.setMarginWidth(0, "0000")
+        self.editor.setMarginLineNumbers(0, True)
+        self.editor.setBraceMatching(QsciScintilla.SloppyBraceMatch)
+        self.editor.setAutoIndent(True)
+        self.editor.setIndentationsUseTabs(False)
+        self.editor.setTabWidth(4)
+        self.editor.setIndentationWidth(4)
+
+        # 保留原控件的尺寸策略和限制
+        self.editor.setSizePolicy(self.ui.textEdit_lua.sizePolicy())
+        self.editor.setMinimumSize(self.ui.textEdit_lua.minimumSize())
+        self.editor.setMaximumSize(self.ui.textEdit_lua.maximumSize())
+        self.editor.setMarginWidth(0, "000")
+        self.editor.setWrapMode(QsciScintilla.WrapNone)  # 不自动换行
+        self.editor.SendScintilla(QsciScintilla.SCI_SETSCROLLWIDTH, 1)  # 减少初始宽度估算
+        self.editor.SendScintilla(QsciScintilla.SCI_SETSCROLLWIDTHTRACKING, True)  # 自适应宽度
+
+        self.editor.linesChanged.connect(self._update_margin_width)
+
+        # 替换旧控件
+        layout.replaceWidget(self.ui.textEdit_lua, self.editor)
+        self.ui.textEdit_lua.deleteLater()
+        self.ui.textEdit_lua = self.editor
+    def _update_margin_width(self):
+        line_count = self.editor.lines()
+        digits = max(2, len(str(line_count)))
+        width = self.editor.fontMetrics().width("9" * (digits + 1))
+        self.editor.setMarginWidth(0, width)
+
 
 
 if __name__ == "__main__":
