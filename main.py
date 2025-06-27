@@ -10,6 +10,12 @@ from ui_form import Ui_Dialog
 from tcpclient import TcpClient
 from commands import *
 import json
+import os
+import re
+
+def sanitize_folder_name(name: str) -> str:
+    # 创建符合系统要求的文件夹名
+    return re.sub(r'[^A-Za-z0-9_\-\.]', '_', name)
 
 
 class SignalBus(QObject):
@@ -26,7 +32,7 @@ class MainApp(QtWidgets.QDialog):
         self.signal_bus.log_signal.connect(self.append_log)
 
         # 初始化 TCP 客户端
-        self.client = TcpClient("192.168.2.169", 8888) #192.168.2.127
+        self.client = TcpClient("192.168.2.127", 8888) #192.168.2.127
         if not self.client.connect():
             self.append_log("[!] 无法连接服务器")
         else:
@@ -38,6 +44,8 @@ class MainApp(QtWidgets.QDialog):
         self.ui.refresh_class_button.clicked.connect(self.refresh_classes)
         self.ui.plainTextEdit_filterClassName.textChanged.connect(self.on_filterClass_text_changed)
         self.ui.plainTextEdit_filterMethodname.textChanged.connect(self.on_filterMethod_text_changed)
+
+        self.ui.pushButton_installHook.clicked.connect(self.on_click_installHook)
 
         # 初始化 model 并绑定到 listView
         self.cmodel = QStringListModel()
@@ -64,6 +72,12 @@ class MainApp(QtWidgets.QDialog):
 
         self.setup_lua_editor()
 
+        
+        # 已经安装的hook列表
+        self.installed_hookList = []
+
+        self.operating_class_name = ''
+        self.operating_method_name = ''
         # 监听消息接收线程
         self.start_recv_thread()
 
@@ -91,6 +105,26 @@ class MainApp(QtWidgets.QDialog):
         text = self.mmodel.data(source_index, Qt.DisplayRole)
         self.ui.tip_methodname.setText('方法名:' + text)
         self.ui.tip_methodname.setToolTip('方法名:' + text)
+        self.operating_method_name = text
+        # 这里直接生成hook模板
+        parts = text.split("//")
+        print(parts)
+        name = parts[0][3:]
+        shorty = parts[2]
+        funcname_enter = name + shorty+ "_enter"
+        funcname_enter =funcname_enter.replace('-','_')
+        funcname_enter =funcname_enter.replace('$','_')
+        funcname_leave = name + shorty+ "_leave"
+        funcname_leave =funcname_leave.replace('-','_')
+        funcname_leave =funcname_leave.replace('$','_')
+        template = """--模板自动生成 请勿修改函数名、参数列表\n
+function """ + funcname_enter + """(args)
+end\n
+function """ + funcname_leave + """(ret)
+end"""
+        self.editor.setText(template)
+        
+
 
     def send_lua_code(self):
         content = self.ui.textEdit_lua.toPlainText().strip()
@@ -109,7 +143,7 @@ class MainApp(QtWidgets.QDialog):
                     messages = self.client.receive()
                     for msg in messages:
                         #self.signal_bus.log_signal.emit(f"[<] 收到: {msg}")
-                        message_handler(self.ui, json.loads(msg))
+                        message_handler(self, json.loads(msg))
                 except Exception as e:
                     self.signal_bus.log_signal.emit(f"[!] 接收异常: {e}")
                     break
@@ -147,6 +181,9 @@ class MainApp(QtWidgets.QDialog):
 
         self.editor.linesChanged.connect(self._update_margin_width)
 
+        self.ui.pushButton_savescript.clicked.connect(self._cache_lua_script)
+        self.ui.pushButton_loadscript.clicked.connect(self._load_lua_script)
+
         # 替换旧控件
         layout.replaceWidget(self.ui.textEdit_lua, self.editor)
         self.ui.textEdit_lua.deleteLater()
@@ -156,6 +193,73 @@ class MainApp(QtWidgets.QDialog):
         digits = max(2, len(str(line_count)))
         width = self.editor.fontMetrics().width("9" * (digits + 1))
         self.editor.setMarginWidth(0, width)
+    def _cache_lua_script(self):
+        if self.operating_class_name != "" and self.operating_method_name != "":
+            folderName = sanitize_folder_name(self.operating_class_name)
+            fileName = sanitize_folder_name(self.operating_method_name)
+            file_path = folderName + "/" + fileName
+            content = self.editor.text()
+            folder = os.path.dirname(file_path)  # 获取目录路径
+            if not os.path.exists(folder):
+                os.makedirs(folder)  # 递归创建目录
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+    def _load_lua_script(self):
+        if self.operating_class_name != "" and self.operating_method_name != "":
+            folderName = sanitize_folder_name(self.operating_class_name)
+            fileName = sanitize_folder_name(self.operating_method_name)
+            file_path = folderName + "/" + fileName
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                self.editor.setText(content)
+            else:
+                # 文件不存在时，清空编辑器
+                self.editor.setText("")
+
+
+    def on_click_installHook(self):
+        text = self.operating_method_name
+        # 这里直接生成hook模板
+        parts = text.split("//")
+
+        name = parts[0]
+        is_static = False
+        if name[:3] == "[S]":
+            is_static = True
+        name = parts[0][3:]
+        shorty = parts[2]
+        funcname_enter = name + shorty+ "_enter"
+        funcname_enter =funcname_enter.replace('-','_')
+        funcname_enter =funcname_enter.replace('$','_')
+        funcname_leave = name + shorty+ "_leave"
+        funcname_leave =funcname_leave.replace('-','_')
+        funcname_leave =funcname_leave.replace('$','_')
+
+        lua_script = self.editor.text()
+
+        enter_start = lua_script.find(funcname_enter)
+        enter_end = lua_script.find('\nend',enter_start) + 4
+
+        leave_start = lua_script.find(funcname_leave)
+        leave_end = lua_script.find('\nend', leave_start) + 4
+
+        luafunction_enter = lua_script[enter_start:enter_end]
+        luafunction_leave = lua_script[leave_start:leave_end]
+        
+
+        data = {
+            'hookFunction': name,
+            'shorty': shorty,
+            'is_static': is_static,
+            'onEnter_FuncName': funcname_enter,
+            'onEnter_Func': luafunction_enter,
+            'onLeave_FuncName': funcname_leave,
+            'onLeave_Func': luafunction_leave,
+        }
+        print(data)
+
 
 
 

@@ -14,18 +14,19 @@ GET_ALL_HOOKS = "GET_ALL_HOOKS"
 
 
 
-def message_handler(ui, json_Data):
+def message_handler(mainapp, json_Data):
     print(json_Data)
     if json_Data[RESULT] != 1:
         return False
     if json_Data[COMMAND] == REFRESH_ALL_CLASS:
         classname_list = json_Data[CLASSLIST]
-        ui.classnameorg_model.setStringList(classname_list)
+        mainapp.ui.classnameorg_model.setStringList(classname_list)
     if json_Data[COMMAND] == REFRESH_ALL_METHODS:
         methods_list = json_Data[METHODS]
-        ui.methodsorg_model.setStringList(methods_list)
-        ui.tip_classname.setText('类名:' + json_Data[CLASSNAME])
-        ui.tip_classname.setToolTip('类名:' + json_Data[CLASSNAME])
+        mainapp.ui.methodsorg_model.setStringList(methods_list)
+        mainapp.ui.tip_classname.setText('类名:' + json_Data[CLASSNAME])
+        mainapp.ui.tip_classname.setToolTip('类名:' + json_Data[CLASSNAME])
+        mainapp.operating_class_name = json_Data[CLASSNAME]
     return True
 
 
