@@ -5,7 +5,7 @@ function loopFunctionDLLLL_enter(args)
     local darray = javaarray_to_luatable(args[2])
     local sarray = javaarray_to_luatable(args[3])
     local struct_array = javaarray_to_luatable(args[4])
-    testStruct["tlong"] = 1
+    testStruct["tlong"] = 0x889
     print(testStruct)
     print(darray)
     print(sarray)

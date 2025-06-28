@@ -149,7 +149,7 @@
        <item>
         <widget class="QPushButton" name="pushButton_installHook">
          <property name="text">
-          <string>安装hook</string>
+          <string>安装/更新hook</string>
          </property>
         </widget>
        </item>
@@ -199,20 +199,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QTextBrowser" name="textBrowser_log">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>16777215</width>
-             <height>125</height>
-            </size>
-           </property>
-          </widget>
+          <widget class="QPlainTextEdit" name="plainTextEdit_logs"/>
          </item>
         </layout>
        </item>
@@ -265,6 +252,13 @@
         <widget class="QPushButton" name="clear_logs_button">
          <property name="text">
           <string>清空日志</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pushButton_unhookAll">
+         <property name="text">
+          <string>Unhook所有</string>
          </property>
         </widget>
        </item>

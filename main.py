@@ -6,17 +6,32 @@ from PyQt5.QtCore import pyqtSignal, QObject
 from PyQt5.QtCore import QStringListModel, QSortFilterProxyModel, Qt, QModelIndex
 from PyQt5.QtWidgets import QAbstractItemView
 from PyQt5.Qsci import QsciScintilla, QsciLexerLua
+from PyQt5.QtWidgets import QApplication, QWidget, QListView, QVBoxLayout, QMenu, QAction, QMessageBox
+from PyQt5.QtCore import QStringListModel, Qt, QPoint
 from ui_form import Ui_Dialog
 from tcpclient import TcpClient
 from commands import *
 import json
 import os
 import re
+from PyQt5.QtCore import pyqtSignal, QObject
+
+class UI_Updators(QObject):
+    ui_signal = pyqtSignal(str)
 
 def sanitize_folder_name(name: str) -> str:
     # 创建符合系统要求的文件夹名
     return re.sub(r'[^A-Za-z0-9_\-\.]', '_', name)
 
+def split_full_name_string(s: str) -> tuple[str, str]:
+    if "/[D]" in s:
+        pos = s.find("/[D]")
+        return s[:pos], s[pos+1:]  # 保留 [D] 在第二部分
+    elif "/[S]" in s:
+        pos = s.find("/[S]")
+        return s[:pos], s[pos+1:]  # 保留 [S] 在第二部分
+    else:
+        return s, ""
 
 class SignalBus(QObject):
     log_signal = pyqtSignal(str)
@@ -32,14 +47,14 @@ class MainApp(QtWidgets.QDialog):
         self.signal_bus.log_signal.connect(self.append_log)
 
         # 初始化 TCP 客户端
-        self.client = TcpClient("192.168.2.127", 8888) #192.168.2.127
+        self.client = TcpClient("192.168.2.138", 8888) #192.168.2.127
         if not self.client.connect():
             self.append_log("[!] 无法连接服务器")
         else:
             self.append_log("[+] 成功连接服务器")
 
         # 绑定按钮事件
-        self.ui.clear_logs_button.clicked.connect(self.ui.textBrowser_log.clear)
+        self.ui.clear_logs_button.clicked.connect(self.ui.plainTextEdit_logs.clear)
         #self.ui.textEdit_lua.textChanged.connect(self.on_text_changed)
         self.ui.refresh_class_button.clicked.connect(self.refresh_classes)
         self.ui.plainTextEdit_filterClassName.textChanged.connect(self.on_filterClass_text_changed)
@@ -48,6 +63,7 @@ class MainApp(QtWidgets.QDialog):
         self.ui.pushButton_installHook.clicked.connect(self.on_click_installHook)
 
         # 初始化 model 并绑定到 listView
+        # 这里是类名的listView
         self.cmodel = QStringListModel()
         self.filter_proxy = QSortFilterProxyModel()
         self.filter_proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)  # 忽略大小写
@@ -59,6 +75,7 @@ class MainApp(QtWidgets.QDialog):
         self.ui.listView_classmethod.setModel(self.filter_proxy)
         self.ui.classnameorg_model = self.cmodel
 
+        # 这里是方法的listView
         self.mmodel = QStringListModel()
         self.mfilter_proxy = QSortFilterProxyModel()
         self.mfilter_proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)  # 忽略大小写
@@ -70,14 +87,29 @@ class MainApp(QtWidgets.QDialog):
         self.ui.listView_methods.setModel(self.mfilter_proxy)
         self.ui.methodsorg_model = self.mmodel
 
-        self.setup_lua_editor()
 
-        
+        # 这里是已安装hook的listView
+        self.hmodel = QStringListModel()
+        self.ui.listView_hooks.setModel(self.hmodel)
+        self.ui.listView_hooks.clicked.connect(self.on_installed_hook_clicked)
         # 已经安装的hook列表
         self.installed_hookList = []
+        self.ui.listView_hooks.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.ui.listView_hooks.customContextMenuRequested.connect(self.show_hook_menu)
+
+        #初始化LUA编辑器
+        self.setup_lua_editor()
 
         self.operating_class_name = ''
         self.operating_method_name = ''
+
+        self.ui_updator = UI_Updators()
+        self.ui_updator.ui_signal.connect(self.append_log)
+
+        self.ui.pushButton_refreshallhooks.clicked.connect(self.on_push_refreshHooks)
+
+        self.ui.pushButton_unhookAll.clicked.connect(self.do_unhook_all);
+
         # 监听消息接收线程
         self.start_recv_thread()
 
@@ -97,7 +129,13 @@ class MainApp(QtWidgets.QDialog):
         text = self.cmodel.data(source_index, Qt.DisplayRole)
         data = {COMMAND: REFRESH_ALL_METHODS, CLASSNAME:text}
         self.client.send(json.dumps(data))
-        self.ui.textBrowser_log.append("[Log] 获取类" + text + "的方法.")
+        self.append_log("[Log] 获取类" + text + "的方法.")
+        self.append_log(f"[>] 发送指令: {json.dumps(data)}")
+
+    def on_push_refreshHooks(self):
+        data = {COMMAND: GET_ALL_HOOKS}
+        self.client.send(json.dumps(data))
+        self.append_log("[Log] 获取所有已安装钩子")
         self.append_log(f"[>] 发送指令: {json.dumps(data)}")
 
     def on_methodname_clicked(self, index: QModelIndex):
@@ -123,7 +161,20 @@ end\n
 function """ + funcname_leave + """(ret)\n    return ret
 end"""
         self.editor.setText(template)
-        
+    
+    def on_installed_hook_clicked(self, index):
+        item_text = index.data()
+        class_name, methodname = split_full_name_string(item_text)
+        self.operating_class_name = class_name
+        self.operating_method_name = methodname
+        self.ui.tip_classname.setText('类名:' + class_name)
+        self.ui.tip_classname.setToolTip('类名:' + class_name)
+        self.ui.tip_methodname.setText('方法名:' + methodname)
+        self.ui.tip_methodname.setToolTip('方法名:' + methodname)
+        for hook in self.installed_hookList:
+            if hook['org_fullname'] == item_text:
+                template = """--模板自动生成 请勿修改函数名、参数列表\n\n""" + hook['onEnter_Func'] + "\n\n" + hook['onLeave_Func']
+                self.editor.setText(template)
 
 
     def send_lua_code(self):
@@ -134,7 +185,18 @@ end"""
             self.ui.textEdit_lua.clear()
 
     def append_log(self, text: str):
-        self.ui.textBrowser_log.append(text)
+        # GPT的建议，只有本来就在底部才滚动
+        scrollbar = self.ui.plainTextEdit_logs.verticalScrollBar()
+        at_bottom = scrollbar.value() == scrollbar.maximum()
+
+        self.ui.plainTextEdit_logs.appendPlainText(text)
+
+        if at_bottom:
+            scrollbar.setValue(scrollbar.maximum())
+
+    def safe_append_log(self, text: str):
+        self.ui_updator.ui_signal.emit(text)
+
 
     def start_recv_thread(self):
         def recv_loop():
@@ -252,6 +314,7 @@ end"""
         data = {
             'className': self.operating_class_name,
             'hookFunction': name,
+            'org_fullname': self.operating_class_name + '/' + self.operating_method_name,
             'shorty': shorty,
             'is_static': is_static,
             'onEnter_FuncName': funcname_enter,
@@ -264,8 +327,49 @@ end"""
         datatosend[COMMAND] = INSTALL_HOOK
         self.client.send(json.dumps(datatosend))
         self.append_log(f"[>] 发送指令: {json.dumps(datatosend)}")
+        self.append_log(f"[>] 脚本已自动保存")
+        self._cache_lua_script()
 
+    def show_installed_hooks(self):
+        content_list = []
+        for hook in self.installed_hookList:
+            content_list.append(hook['org_fullname'])
+        self.hmodel.setStringList(content_list)
 
+    def show_hook_menu(self, pos: QPoint):
+        index = self.ui.listView_hooks.indexAt(pos)
+        if not index.isValid():
+            return
+        item_text = self.hmodel.data(index, Qt.DisplayRole)
+        # 创建右键菜单
+        menu = QMenu(self)
+        # 添加一个 QAction
+        action_delete = QAction("Unhook " + item_text, self)
+        action_delete.triggered.connect(lambda: self.unhook_single(index))
+        menu.addAction(action_delete)
+        # 弹出菜单
+        menu.exec_(self.ui.listView_hooks.viewport().mapToGlobal(pos))
+
+    def unhook_single(self, index):
+        hook_to_uninstall = index.data();
+        self.append_log("[Log] 尝试Unhook " + hook_to_uninstall)
+        self.do_unhook(hook_to_uninstall)
+        #row = index.row()
+        #self.model.removeRow(row)
+        #QMessageBox.information(self, "提示", f"已删除第 {row+1} 项")
+
+    def do_unhook_all(self):
+        for hook in self.installed_hookList:
+            self.do_unhook(hook['org_fullname'])
+            
+    def do_unhook(self, fullname):
+        data = {
+            COMMAND: UNINSTALL_HOOK,
+            UNINSTALL_FULLNAME: fullname
+        }
+        self.client.send(json.dumps(data))
+        self.append_log(f"[>] 发送指令: {json.dumps(data)}")
+    
 
 
 

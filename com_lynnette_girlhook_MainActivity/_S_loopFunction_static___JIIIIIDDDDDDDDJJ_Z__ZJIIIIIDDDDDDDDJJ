@@ -1,0 +1,9 @@
+--模板自动生成 请勿修改函数名、参数列表
+
+function loopFunction_staticZJIIIIIDDDDDDDDJJ_enter(args)
+    return true, args, 0
+end
+
+function loopFunction_staticZJIIIIIDDDDDDDDJJ_leave(ret)
+    return ret
+end
