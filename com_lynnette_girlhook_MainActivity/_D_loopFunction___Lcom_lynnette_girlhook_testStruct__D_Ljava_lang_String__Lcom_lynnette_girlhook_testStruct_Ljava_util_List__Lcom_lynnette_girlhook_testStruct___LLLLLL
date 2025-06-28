@@ -1,27 +1,26 @@
 --模板自动生成 请勿修改函数名、参数列表
 
-function loopFunctionDLLLL_enter(args)
+function loopFunctionLLLLLL_enter(args)
     local testStruct = jobject_to_luatable(args[1])
     local darray = javaarray_to_luatable(args[2])
     local sarray = javaarray_to_luatable(args[3])
     local struct_array = javaarray_to_luatable(args[4])
-    testStruct["tlong"] = 1
-    print(testStruct)
-    print(darray)
-    print(sarray)
-    struct_array[1]["tint"] = 8
+    local listTest = javalist_to_luatable(args[5])
+    testStruct["tlong"] = 0x888
+    print(listTest)
+    listTest[1] = "修改列表测试"
+    apply_soltable_to_existing_javalist(listTest, args[5])
 
     darray[1] = 0.001
     darray[2] = 0.002
 
-    sarray[1] = "我试着修改"
+    sarray[1] = "修改字符串测试"
     apply_soltable_to_existing_jobject(testStruct, args[1])
     apply_soltable_to_existing_javaarray(sarray, args[3])
     apply_soltable_to_existing_javaarray(darray, args[2])
-    apply_soltable_to_existing_javaarray(struct_array, args[4])
     return true, args, 0
 end
 
-function loopFunctionDLLLL_leave(ret)
-    return ret + 1
+function loopFunctionLLLLLL_leave(ret)
+    return ret
 end

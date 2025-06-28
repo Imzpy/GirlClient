@@ -134,6 +134,9 @@ class Ui_Dialog(object):
         self.pushButton_unhookAll = QtWidgets.QPushButton(Dialog)
         self.pushButton_unhookAll.setObjectName("pushButton_unhookAll")
         self.horizontalLayout_buttons.addWidget(self.pushButton_unhookAll)
+        self.pushButton_reconnect = QtWidgets.QPushButton(Dialog)
+        self.pushButton_reconnect.setObjectName("pushButton_reconnect")
+        self.horizontalLayout_buttons.addWidget(self.pushButton_reconnect)
         self.verticalLayout_bottom.addLayout(self.horizontalLayout_buttons)
         self.gridLayout.addLayout(self.verticalLayout_bottom, 1, 0, 1, 3)
 
@@ -158,3 +161,4 @@ class Ui_Dialog(object):
         self.pushButton_refreshallhooks.setText(_translate("Dialog", "刷新已安装hook"))
         self.clear_logs_button.setText(_translate("Dialog", "清空日志"))
         self.pushButton_unhookAll.setText(_translate("Dialog", "Unhook所有"))
+        self.pushButton_reconnect.setText(_translate("Dialog", "重连TCP"))

@@ -15,6 +15,8 @@ import json
 import os
 import re
 from PyQt5.QtCore import pyqtSignal, QObject
+import argparse
+
 
 class UI_Updators(QObject):
     ui_signal = pyqtSignal(str)
@@ -42,16 +44,16 @@ class MainApp(QtWidgets.QDialog):
         super().__init__()
         self.ui = Ui_Dialog()
         self.ui.setupUi(self)
-
+        self.setWindowTitle("GirlClient")
         self.signal_bus = SignalBus()
         self.signal_bus.log_signal.connect(self.append_log)
 
         # 初始化 TCP 客户端
-        self.client = TcpClient("192.168.2.138", 8888) #192.168.2.127
+        self.client = TcpClient(ip, port) #192.168.2.127
         if not self.client.connect():
             self.append_log("[!] 无法连接服务器")
         else:
-            self.append_log("[+] 成功连接服务器")
+            self.append_log("[+] 成功连接服务器 " + ip + ":" + str(port))
 
         # 绑定按钮事件
         self.ui.clear_logs_button.clicked.connect(self.ui.plainTextEdit_logs.clear)
@@ -59,7 +61,7 @@ class MainApp(QtWidgets.QDialog):
         self.ui.refresh_class_button.clicked.connect(self.refresh_classes)
         self.ui.plainTextEdit_filterClassName.textChanged.connect(self.on_filterClass_text_changed)
         self.ui.plainTextEdit_filterMethodname.textChanged.connect(self.on_filterMethod_text_changed)
-
+        self.ui.pushButton_reconnect.clicked.connect(self.on_push_reconnect)
         self.ui.pushButton_installHook.clicked.connect(self.on_click_installHook)
 
         # 初始化 model 并绑定到 listView
@@ -112,6 +114,18 @@ class MainApp(QtWidgets.QDialog):
 
         # 监听消息接收线程
         self.start_recv_thread()
+
+    def on_push_reconnect(self):
+        try:
+            self.client.close()
+            self.client.connect()
+            if not self.client.connect():
+                self.append_log("[!] 无法连接服务器")
+            else:
+                self.append_log("[+] 成功连接服务器 " + ip + ":" + str(port))
+        
+        except Exception as e:
+            self.append_log("[!] 无法连接服务器 Error:" + e)
 
     def on_filterClass_text_changed(self,text):
         self.filter_proxy.setFilterFixedString(text)
@@ -361,7 +375,7 @@ end"""
     def do_unhook_all(self):
         for hook in self.installed_hookList:
             self.do_unhook(hook['org_fullname'])
-            
+
     def do_unhook(self, fullname):
         data = {
             COMMAND: UNINSTALL_HOOK,
@@ -374,6 +388,14 @@ end"""
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="接受 IP 和端口号参数")
+    parser.add_argument("ip", type=str, help="IP 地址，例如 127.0.0.1")
+    parser.add_argument("port", type=int, help="端口号，例如 8080")
+    args = parser.parse_args()
+    global ip
+    ip = args.ip
+    global port 
+    port = args.port
     app = QtWidgets.QApplication(sys.argv)
     window = MainApp()
     window.show()

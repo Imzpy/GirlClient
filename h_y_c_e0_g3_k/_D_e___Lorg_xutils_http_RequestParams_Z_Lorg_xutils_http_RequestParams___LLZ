@@ -1,0 +1,12 @@
+--模板自动生成 请勿修改函数名、参数列表
+
+function eLLZ_enter(args)
+    return true, args, 0
+end
+
+function eLLZ_leave(ret)
+    local t = jobject_to_luatable(ret)
+    local M = jobject_to_luatable(t["M"])
+    print(B)
+    return ret
+end

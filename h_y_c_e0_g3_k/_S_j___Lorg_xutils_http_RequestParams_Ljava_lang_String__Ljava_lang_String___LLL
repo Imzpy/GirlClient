@@ -1,0 +1,14 @@
+--模板自动生成 请勿修改函数名、参数列表
+
+function jLLL_enter(args)
+    print(args)
+    print(args[1])
+    print(args[2])
+    local t1 = jobject_to_luatable(args[2])
+    print(t1)
+    return true, args, 0
+end
+
+function jLLL_leave(ret)
+    return ret
+end
