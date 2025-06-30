@@ -1,10 +1,11 @@
 --模板自动生成 请勿修改函数名、参数列表
 
-function loopFunctionLLLLLL_enter(args)
+function isSuccessfulZ_enter(args)
+    print("is")
     print(args)
     return true, args, 0
 end
 
-function loopFunctionLLLLLL_leave(ret)
+function isSuccessfulZ_leave(ret)
     return ret
 end

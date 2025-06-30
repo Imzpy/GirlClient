@@ -1,10 +1,10 @@
 --模板自动生成 请勿修改函数名、参数列表
 
-function loopFunctionLLLLLL_enter(args)
-    print(args)
+function getEncryptUtilL_enter(args)
+    print("util")
     return true, args, 0
 end
 
-function loopFunctionLLLLLL_leave(ret)
+function getEncryptUtilL_leave(ret)
     return ret
 end

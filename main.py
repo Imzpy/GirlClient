@@ -187,7 +187,7 @@ end"""
         self.ui.tip_methodname.setToolTip('方法名:' + methodname)
         for hook in self.installed_hookList:
             if hook['org_fullname'] == item_text:
-                template = """--模板自动生成 请勿修改函数名、参数列表\n\n""" + hook['onEnter_Func'] + "\n\n" + hook['onLeave_Func']
+                template = hook['script']
                 self.editor.setText(template)
 
 
@@ -332,9 +332,8 @@ end"""
             'shorty': shorty,
             'is_static': is_static,
             'onEnter_FuncName': funcname_enter,
-            'onEnter_Func': luafunction_enter,
             'onLeave_FuncName': funcname_leave,
-            'onLeave_Func': luafunction_leave,
+            'script': lua_script,
         }
         print(data)
         datatosend = data
