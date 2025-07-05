@@ -110,7 +110,9 @@ class MainApp(QtWidgets.QDialog):
 
         self.ui.pushButton_refreshallhooks.clicked.connect(self.on_push_refreshHooks)
 
-        self.ui.pushButton_unhookAll.clicked.connect(self.do_unhook_all);
+        self.ui.pushButton_unhookAll.clicked.connect(self.do_unhook_all)
+        
+        self.ui.pushButton_dump.clicked.connect(self.do_dump)
 
         # 监听消息接收线程
         self.start_recv_thread()
@@ -127,6 +129,12 @@ class MainApp(QtWidgets.QDialog):
         except Exception as e:
             self.append_log("[!] 无法连接服务器 Error:" + e)
 
+
+    def do_dump(self):
+        data = {COMMAND: DUMP_DEX}
+        self.client.send(json.dumps(data))
+        self.append_log("[Log] Dump全部Dex")
+        
     def on_filterClass_text_changed(self,text):
         self.filter_proxy.setFilterFixedString(text)
 

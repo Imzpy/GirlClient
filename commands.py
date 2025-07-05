@@ -27,6 +27,9 @@ LOGCONTENT = "logs"
 UNINSTALL_HOOK = "UNINSTALL_HOOK"
 UNINSTALL_FULLNAME = "UNINSTALL_FULLNAME"
 
+#dump
+DUMP_DEX = "DUMP_DEX"
+
 def message_handler(mainapp, json_Data):
     print(json_Data)
     if json_Data[RESULT] == 0:

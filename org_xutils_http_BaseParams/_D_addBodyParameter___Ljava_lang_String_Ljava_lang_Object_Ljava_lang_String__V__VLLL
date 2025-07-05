@@ -1,9 +1,0 @@
---模板自动生成 请勿修改函数名、参数列表
-
-function addBodyParameterVLLL_enter(args)
-    return true, args, 0
-end
-
-function addBodyParameterVLLL_leave(ret)
-    return ret
-end

@@ -263,6 +263,13 @@
         </widget>
        </item>
        <item>
+        <widget class="QPushButton" name="pushButton_dump">
+         <property name="text">
+          <string>DUMP所有dex</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QPushButton" name="pushButton_reconnect">
          <property name="text">
           <string>重连TCP</string>
