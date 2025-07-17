@@ -18,6 +18,10 @@ INSTALLED_HOOK_INFO = "installed_hook_info"
 GET_ALL_HOOKS = "GET_ALL_HOOKS"
 HOOKS = "hooks"
 
+#直接执行脚本
+EXCUTE_SCRIPT = "EXCUTE_SCRIPT"
+SCRIPT = "script"
+
 
 #LOG
 TCPLOG = "TCP_Log"

@@ -85,6 +85,8 @@ class MainApp(QtWidgets.QDialog):
         self.mfilter_proxy.setSourceModel(self.mmodel)
         self.ui.listView_methods.clicked.connect(self.on_methodname_clicked)
         self.ui.listView_methods.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.ui.listView_methods.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.ui.listView_methods.customContextMenuRequested.connect(self.show_rpc_menu)
         # 设置 listView 显示代理模型（而不是原始 model）
         self.ui.listView_methods.setModel(self.mfilter_proxy)
         self.ui.methodsorg_model = self.mmodel
@@ -101,6 +103,7 @@ class MainApp(QtWidgets.QDialog):
 
         #初始化LUA编辑器
         self.setup_lua_editor()
+        self.setup_lua_editor_tab2()
 
         self.operating_class_name = ''
         self.operating_method_name = ''
@@ -114,9 +117,17 @@ class MainApp(QtWidgets.QDialog):
         
         self.ui.pushButton_dump.clicked.connect(self.do_dump)
 
+        
+        self.ui.tabWidget.currentChanged.connect(self.on_tab_changed)
+        self.ui.tabWidget.setCurrentIndex(0)
+
+        self.ui.excute_script.clicked.connect(self.excute_script)
+
         # 监听消息接收线程
         self.start_recv_thread()
 
+    def on_tab_changed(self, index):
+        pass
     def on_push_reconnect(self):
         try:
             self.client.close()
@@ -199,19 +210,27 @@ end"""
                 self.editor.setText(template)
 
 
-    def send_lua_code(self):
-        content = self.ui.textEdit_lua.toPlainText().strip()
+    def excute_script(self):
+        data = {COMMAND: EXCUTE_SCRIPT}
+        content = self.editor_tab2.text()
+        data[SCRIPT] = content
         if content:
-            self.client.send(content)
-            self.append_log(f"[>] 发送: {content}")
-            self.ui.textEdit_lua.clear()
+            self.client.send(json.dumps(data))
+            self.append_log(f"[>] 发送指令: {json.dumps(data)}")
+            
 
     def append_log(self, text: str):
         # GPT的建议，只有本来就在底部才滚动
-        scrollbar = self.ui.plainTextEdit_logs.verticalScrollBar()
+        current_index = self.ui.tabWidget.currentIndex()
+        if current_index == 0:
+            log_widget = self.ui.plainTextEdit_logs
+        else:
+            log_widget = self.ui.log_in_tab_2
+
+        scrollbar = log_widget.verticalScrollBar()
         at_bottom = scrollbar.value() == scrollbar.maximum()
 
-        self.ui.plainTextEdit_logs.appendPlainText(text)
+        log_widget.appendPlainText(text)
 
         if at_bottom:
             scrollbar.setValue(scrollbar.maximum())
@@ -268,10 +287,46 @@ end"""
         self.ui.pushButton_savescript.clicked.connect(self._cache_lua_script)
         self.ui.pushButton_loadscript.clicked.connect(self._load_lua_script)
 
+        self.ui.pushButton_save_tab2.clicked.connect(self.save_script_tab_2)
+        self.ui.pushButton_load_tab2.clicked.connect(self.load_script_tab_2)
+
         # 替换旧控件
         layout.replaceWidget(self.ui.textEdit_lua, self.editor)
         self.ui.textEdit_lua.deleteLater()
         self.ui.textEdit_lua = self.editor
+    
+    def setup_lua_editor_tab2(self):
+        parent = self.ui.textEdit_lua_tab2.parent()  # 你在 Qt Designer 中放的一个 QTextEdit 占位控件
+        layout = parent.layout()
+
+        self.editor_tab2 = QsciScintilla()
+        self.editor_tab2.setLexer(QsciLexerLua())
+        self.editor_tab2.setUtf8(True)
+        self.editor_tab2.setMarginsFont(self.editor_tab2.font())
+        self.editor_tab2.setMarginWidth(0, "00000")
+        self.editor_tab2.setMarginLineNumbers(0, True)
+        self.editor_tab2.setBraceMatching(QsciScintilla.SloppyBraceMatch)
+        self.editor_tab2.setAutoIndent(True)
+        self.editor_tab2.setIndentationsUseTabs(False)
+        self.editor_tab2.setTabWidth(4)
+        self.editor_tab2.setIndentationWidth(4)
+
+        # 放大一些的尺寸策略
+        self.editor_tab2.setSizePolicy(self.ui.textEdit_lua_tab2.sizePolicy())
+        self.editor_tab2.setMinimumSize(self.ui.textEdit_lua_tab2.minimumSize())
+        self.editor_tab2.setMaximumSize(self.ui.textEdit_lua_tab2.maximumSize())
+        self.editor_tab2.setWrapMode(QsciScintilla.WrapNone)
+        self.editor_tab2.SendScintilla(QsciScintilla.SCI_SETSCROLLWIDTH, 1)
+        self.editor_tab2.SendScintilla(QsciScintilla.SCI_SETSCROLLWIDTHTRACKING, True)
+
+        self.editor_tab2.linesChanged.connect(self._update_margin_width)
+
+        # 替换原来的 textEdit_lua_tab2 占位控件
+        layout.replaceWidget(self.ui.textEdit_lua_tab2, self.editor_tab2)
+        self.ui.textEdit_lua_tab2.deleteLater()
+        self.ui.textEdit_lua_tab2 = self.editor_tab2
+
+
     def _update_margin_width(self):
         line_count = self.editor.lines()
         digits = max(2, len(str(line_count)))
@@ -298,9 +353,20 @@ end"""
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
                 self.editor.setText(content)
-            else:
-                # 文件不存在时，清空编辑器
-                self.editor.setText("")
+
+
+    def save_script_tab_2(self):
+        file_path = "rpc.lua"
+        content = self.editor_tab2.text()
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+    def load_script_tab_2(self):
+        file_path = "rpc.lua"
+        if os.path.exists(file_path):
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.editor_tab2.setText(content)
 
 
     def on_click_installHook(self):
@@ -378,6 +444,60 @@ end"""
         #row = index.row()
         #self.model.removeRow(row)
         #QMessageBox.information(self, "提示", f"已删除第 {row+1} 项")
+
+    def show_rpc_menu(self, pos: QPoint):
+        index = self.ui.listView_methods.indexAt(pos)
+        if not index.isValid():
+            return
+        item_text = self.mmodel.data(index, Qt.DisplayRole)
+        # 创建右键菜单
+        menu = QMenu(self)
+        # 添加一个 QAction
+        action_delete = QAction("RPC " + item_text, self)
+        action_delete.triggered.connect(lambda: self.RPC_single(index))
+        menu.addAction(action_delete)
+        # 弹出菜单
+        menu.exec_(self.ui.listView_methods.viewport().mapToGlobal(pos))
+
+    def RPC_single(self,index):
+        to_rpc = index.data();
+        parts = to_rpc.split("//")
+
+        name = parts[0]
+        is_static = False
+        if name[:3] == "[S]":
+            is_static = True
+        name = parts[0][3:]
+        shorty = parts[2]
+        classname = self.operating_class_name.replace("/", ".")
+        if not is_static:
+            templates_lua = f"""
+local instances = find_class_instance("{classname}")
+
+if type(instances) ~= "table" or next(instances) == nil then
+    print("找不到实例")
+else
+-- instances是所有实例 你可以打印或者修改默认使用的索引
+    local info = {{"{classname}","{name}","{shorty}", {str(is_static).lower()},instances[1]}}
+    local args = {{"这里写你的参数}}
+    local ret = call_java_function(info, args)
+    print(type(ret))
+    print(ret)
+    return ret
+end
+"""
+        else:
+            templates_lua = f"""
+local info = {{"{classname}","{name}","{shorty}", {str(is_static).lower()},0}}
+local args = {{"这里写你的参数"}}
+local ret = call_java_function(info, args)
+print(type(ret))
+print(ret)
+return ret
+"""
+        self.ui.tabWidget.setCurrentIndex(1)
+        self.editor_tab2.setText(templates_lua)
+        
 
     def do_unhook_all(self):
         for hook in self.installed_hookList:
